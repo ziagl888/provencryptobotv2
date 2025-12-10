@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Crypto Sentiment</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --card-bg: #1a1a1a;
+            --text-main: #ffffff;
+            --text-sec: #888888;
+            --accent: #00ffff;
+            --green: #00ff88;
+            --red: #ff3040;
+            --orange: #ffaa00;
+        }
+        body {
+            margin: 0; padding: 16px;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* HEADLINE CARD */
+        .main-card {
+            background: linear-gradient(145deg, #1e1e1e, #141414);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #333;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+        .sentiment-label { font-size: 14px; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; }
+        .sentiment-value { font-size: 32px; font-weight: 800; margin: 10px 0; text-shadow: 0 0 15px rgba(0,255,255,0.3); }
+        
+        /* GRID LAYOUT */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .label { font-size: 12px; color: var(--text-sec); margin-bottom: 5px; }
+        .value { font-size: 18px; font-weight: 600; }
+        .sub { font-size: 12px; margin-left: 6px; }
+        .green { color: var(--green); }
+        .red { color: var(--red); }
+
+        /* FEAR & GREED BAR */
+        .fg-container { margin-top: 5px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; }
+        .fg-fill { height: 100%; border-radius: 3px; transition: width 1s; }
+
+        /* LS RATIO BARS */
+        .ls-row { display: flex; align-items: center; margin-bottom: 12px; }
+        .ls-label { width: 40px; font-weight: bold; font-size: 14px; }
+        .ls-bar-bg { flex-grow: 1; height: 8px; background: #333; border-radius: 4px; margin: 0 10px; overflow: hidden; position: relative; }
+        .ls-fill { height: 100%; background: var(--green); width: 50%; transition: width 0.5s; }
+        .ls-val { width: 40px; text-align: right; font-size: 14px; font-family: monospace; }
+        
+        h3 { margin: 0 0 15px 0; font-size: 16px; color: var(--text-sec); border-bottom: 1px solid #333; padding-bottom: 5px;}
+        
+        .footer { text-align: center; color: #444; font-size: 11px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+
+    <!-- Main Sentiment -->
+    <div class="main-card" id="mainCard">
+        <div class="sentiment-label">Market Mood</div>
+        <div class="sentiment-value" id="mood">LOADING...</div>
+        <div style="font-size:12px; color:#666;" id="timestamp">Updating...</div>
+    </div>
+
+    <!-- Prices -->
+    <div class="grid">
+        <div class="card">
+            <div class="label">BTC Price</div>
+            <div class="value">$<span id="btc">0</span></div>
+            <div class="sub" id="btc_chg">0%</div>
+        </div>
+        <div class="card">
+            <div class="label">ETH Price</div>
+            <div class="value">$<span id="eth">0</span></div>
+            <div class="sub" id="eth_chg">0%</div>
+        </div>
+        <div class="card">
+            <div class="label">BTC Dom</div>
+            <div class="value"><span id="dom">0</span>%</div>
+        </div>
+        <div class="card">
+            <div class="label">OI (Billions)</div>
+            <div class="value">$<span id="oi">0</span>B</div>
+        </div>
+    </div>
+
+    <!-- Fear & Greed -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="label">Fear & Greed Index</div>
+            <div class="value" id="fg_val">0</div>
+        </div>
+        <div style="font-size:13px; margin-bottom:8px; color:#ccc;" id="fg_txt">Neutral</div>
+        <div class="fg-container">
+            <div class="fg-fill" id="fg_bar" style="width: 50%; background: #ffff00;"></div>
+        </div>
+    </div>
+
+    <!-- Long/Short Ratios -->
+    <div class="card">
+        <h3>Long / Short Ratios</h3>
+        <div class="ls-row">
+            <div class="ls-label">BTC</div>
+            <div class="ls-bar-bg"><div class="ls-fill" id="ls_btc_bar"></div></div>
+            <div class="ls-val" id="ls_btc">1.0</div>
+        </div>
+        <div class="ls-row">
+            <div class="ls-label">ETH</div>
+            <div class="ls-bar-bg"><div class="ls-fill" id="ls_eth_bar"></div></div>
+            <div class="ls-val" id="ls_eth">1.0</div>
+        </div>
+        <div class="ls-row">
+            <div class="ls-label">TOT</div>
+            <div class="ls-bar-bg"><div class="ls-fill" id="ls_tot_bar"></div></div>
+            <div class="ls-val" id="ls_tot">1.0</div>
+        </div>
+    </div>
+
+    <div class="footer">Data provided by YourBot • Telegram WebApp</div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Vollbild öffnen
+
+        function parseData() {
+            // Daten aus dem URL Hash holen (#data=...)
+            const hash = window.location.hash.substring(1); 
+            const params = new URLSearchParams(hash);
+            const b64 = params.get('data');
+            
+            if (!b64) return null;
+
+            try {
+                // Base64 decode + JSON parse
+                const jsonStr = atob(b64);
+                return JSON.parse(jsonStr);
+            } catch (e) {
+                console.error("Data error", e);
+                return null;
+            }
+        }
+
+        const data = parseData();
+
+        if (data) {
+            // --- Helper ---
+            const setTxt = (id, val) => document.getElementById(id).innerText = val;
+            const setClass = (id, val) => {
+                const el = document.getElementById(id);
+                el.className = 'sub ' + (val >= 0 ? 'green' : 'red');
+                el.innerText = (val > 0 ? '+' : '') + val + '%';
+            };
+
+            // --- Fill Data ---
+            setTxt('mood', data.sent);
+            setTxt('timestamp', 'Updated: ' + data.ts);
+
+            // Styling Main Mood
+            const moodEl = document.getElementById('mood');
+            if(data.sent.includes('BULL')) moodEl.style.color = '#00ff88';
+            else if(data.sent.includes('BEAR')) moodEl.style.color = '#ff3040';
+            else moodEl.style.color = '#ffff00';
+
+            // Prices
+            setTxt('btc', data.btc.toLocaleString());
+            setClass('btc_chg', data.btc_chg);
+            
+            setTxt('eth', data.eth.toLocaleString());
+            setClass('eth_chg', data.eth_chg);
+            
+            setTxt('dom', data.dom);
+            setTxt('oi', data.oi);
+
+            // Fear & Greed
+            setTxt('fg_val', data.fg);
+            setTxt('fg_txt', data.fg_txt);
+            const fgBar = document.getElementById('fg_bar');
+            fgBar.style.width = data.fg + '%';
+            // Farbe F&G
+            if(data.fg > 75) fgBar.style.background = '#00ff00';
+            else if(data.fg > 50) fgBar.style.background = '#88ff88';
+            else if(data.fg > 25) fgBar.style.background = '#ffaa00';
+            else fgBar.style.background = '#ff0000';
+
+            // Long Short Logic (Ratio to Percentage)
+            // Ratio 1.0 = 50% Long. Ratio 2.0 = 66% Long. Formula: R / (R+1)
+            const updateLS = (id, ratio) => {
+                setTxt(id, ratio);
+                const pct = (ratio / (ratio + 1)) * 100;
+                const bar = document.getElementById(id + '_bar');
+                bar.style.width = pct + '%';
+                // Farbe: Wenn Ratio > 1 (mehr Longs) Grün, sonst Rot
+                bar.style.background = ratio >= 1.0 ? '#00ff88' : '#ff3040';
+            };
+
+            updateLS('ls_btc', data.ls_btc);
+            updateLS('ls_eth', data.ls_eth);
+            updateLS('ls_tot', data.ls_tot);
+        }
+    </script>
+</body>
+</html>
