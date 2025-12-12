@@ -93,6 +93,8 @@
             font-size: 13px;
             margin-top: 10px;
         }
+
+        .no-data { text-align: center; color: #666; padding: 20px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -130,19 +132,19 @@
 
     <!-- Top Gainers -->
     <h3>Top 10 Gainers (24h)</h3>
-    <div class="list" id="gainers">Loading...</div>
+    <div class="list" id="gainers"><div class="no-data">Loading...</div></div>
 
     <!-- Top Losers -->
     <h3>Top 10 Losers (24h)</h3>
-    <div class="list" id="losers">Loading...</div>
+    <div class="list" id="losers"><div class="no-data">Loading...</div></div>
 
     <!-- Volume Spikes -->
     <h3>Volume Spikes (4h vs 7d avg)</h3>
-    <div class="list" id="volume">No extreme spikes</div>
+    <div class="list" id="volume"><div class="no-data">No extreme spikes</div></div>
 
     <!-- Volatile Coins -->
     <h3>Most Volatile (4h range ≥10%)</h3>
-    <div class="list" id="volatile">Loading...</div>
+    <div class="list" id="volatile"><div class="no-data">Loading...</div></div>
 
     <div class="footer">
         Proven Crypto Bot V2 • Live Data • Updated every 15s
@@ -153,13 +155,20 @@
         tg.ready();
         tg.expand();
 
-        // Theme Support
-        if (tg.colorScheme === 'light') {
-            document.documentElement.style.setProperty('--bg-color', '#ffffff');
-            document.documentElement.style.setProperty('--card-bg', '#f0f0f0');
-            document.documentElement.style.setProperty('--text-main', '#000000');
-            document.documentElement.style.setProperty('--text-sec', '#666666');
-        }
+        // Theme Support (Dark/Light)
+        tg.onEvent('themeChanged', () => {
+            if (tg.colorScheme === 'light') {
+                document.documentElement.style.setProperty('--bg-color', '#ffffff');
+                document.documentElement.style.setProperty('--card-bg', '#f0f0f0');
+                document.documentElement.style.setProperty('--text-main', '#000000');
+                document.documentElement.style.setProperty('--text-sec', '#666666');
+            } else {
+                document.documentElement.style.setProperty('--bg-color', '#0d0d0d');
+                document.documentElement.style.setProperty('--card-bg', '#1a1a1a');
+                document.documentElement.style.setProperty('--text-main', '#ffffff');
+                document.documentElement.style.setProperty('--text-sec', '#888888');
+            }
+        });
 
         function setText(id, text) {
             const el = document.getElementById(id);
@@ -169,14 +178,14 @@
         function renderList(containerId, items, isGainer = true) {
             const container = document.getElementById(containerId);
             if (!items || items.length === 0) {
-                container.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">No data</div>';
+                container.innerHTML = '<div class="no-data">No data available</div>';
                 return;
             }
             container.innerHTML = items.map((c, i) => `
                 <div class="item">
                     <span class="rank">${(i+1).toString().padStart(2, '0')}</span>
                     <span class="sym">${c.symbol}</span>
-                    <span class="vol">$${c.price}</span>
+                    <span class="vol">$${Number(c.price).toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
                     <span class="${isGainer ? 'green' : 'red'} spike">${c.change > 0 ? '+' : ''}${c.change.toFixed(2)}%</span>
                 </div>
             `).join('');
@@ -184,7 +193,9 @@
 
         async function loadAllData() {
             try {
-                const res = await fetch('https://dein-bot-domain.com/api/webdashboard'); // ← später eintragen
+                // Hole von deiner API (ersetze mit deiner Domain/Port)
+                const res = await fetch('http://localhost:8000/api/webdashboard');  // ← Ändere zu deiner URL!
+                if (!res.ok) throw new Error('API Error');
                 const data = await res.json();
 
                 // Mood
@@ -222,30 +233,26 @@
                 renderList('losers', data.top_losers, false);
 
                 // Volume Spikes
+                const volContainer = document.getElementById('volume');
                 if (data.volume_spikes?.length > 0) {
-                    document.getElementById('volume').innerHTML = data.volume_spikes.map(s => `
+                    volContainer.innerHTML = data.volume_spikes.map(s => `
                         <div class="item">
                             <span class="sym">${s.symbol}</span>
                             <span class="vol">$${s.usd_4h > 1e9 ? (s.usd_4h/1e9).toFixed(2)+'B' : (s.usd_4h/1e6).toFixed(1)+'M'}</span>
                             <span class="spike ${s.ratio >= 10 ? 'orange' : s.ratio >= 6 ? 'red' : 'green'}">${s.ratio.toFixed(1)}×</span>
                         </div>
                     `).join('');
+                } else {
+                    volContainer.innerHTML = '<div class="no-data">No extreme spikes</div>';
                 }
 
                 // Volatile
-                if (data.volatile?.length > 0) {
-                    document.getElementById('volatile').innerHTML = data.volatile.map(v => `
-                        <div class="item">
-                            <span class="sym">${v.symbol}</span>
-                            <span class="vol">${v.high.toFixed(4)} → ${v.low.toFixed(4)}</span>
-                            <span class="${v.range >= 20 ? 'orange' : 'red'}">${v.range.toFixed(1)}%</span>
-                        </div>
-                    `).join('');
-                }
+                renderList('volatile', data.volatile.map(v => ({...v, change: v.range})), false);  // Reuse render, change = range
 
             } catch (e) {
                 console.error(e);
                 setText('mood', 'Error loading data');
+                document.getElementById('gainers').innerHTML = '<div class="no-data">API Error</div>';
             }
         }
 
